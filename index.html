@@ -64,14 +64,14 @@ let cameraMovementTime = 0;
 let visualizerMovementTime = 0;
 let focusTransitionTime = 0;
 let particleCount = 3000;
-const audio = new Audio('Forest Rhythm - Track 1 - Sonauto (2).wav');
+let audio = new Audio('Forest Rhythm - Track 1 - Sonauto (2).wav');
 let ambientStars;
 let focusPoint = new THREE.Vector3(0, 0, 0);
 let targetFocusPoint = new THREE.Vector3(0, 0, 0);
 let bassAvg = 0;
 let zoomPhase = 0;
 let targetZoom = 50;
-const FOCUS_TRANSITION_DURATION = 10;
+let FOCUS_TRANSITION_DURATION = 10;
 class Visualizer {
   constructor(offset = new THREE.Vector3(0, 0, 0), particleCount = 3000, algorithm = 0) {
     this.particles = this.createParticles(particleCount);
@@ -107,8 +107,8 @@ class Visualizer {
     return new THREE.Points(geometry, material);
   }
   updateParticle(i, positions, colors, sizes, frequency, waveform, bassAvg) {
-    const particleCount = positions.length / 3;
-    const algorithms = [() => {
+    let particleCount = positions.length / 3;
+    let algorithms = [() => {
       const angle = i / 3 * 0.1 + bassAvg / 255 * 0.1;
       const radius = (i / 3 * 0.02 + frequency / 255 * 0.5) % 50;
       positions[i] = Math.cos(angle) * radius * (1 + waveform * 0.2);
@@ -254,7 +254,7 @@ class Visualizer {
       }
     }, () => {
       const t = Date.now() * 0.0005;
-      const angle = Math.atan2(positions[i + 1], positions[i]) + t;
+      const angle = Math.atan2(positions[i + 2], positions[i]) + t;
       const r = Math.sqrt(positions[i] ** 2 + positions[i + 1] ** 2);
       const spiral = Math.exp(0.1 * angle);
       positions[i] = Math.cos(angle) * r * spiral * (1 + frequency / 255);
@@ -374,8 +374,8 @@ function updateCamera() {
     currentVisualizer = (currentVisualizer + 1) % visualizers.length;
   }
   cameraMovementTime += 0.001;
-  const radius = 600;
-  const height = Math.sin(cameraMovementTime * 0.5) * 200;
+  let radius = 600;
+  let height = Math.sin(cameraMovementTime * 0.5) * 200;
   let x = Math.cos(cameraMovementTime) * radius;
   let y = height;
   let z = Math.sin(cameraMovementTime) * radius;
@@ -383,12 +383,12 @@ function updateCamera() {
   cameraTargetPosition.y = y;
   cameraTargetPosition.z = z;
   if (currentVisualizer >= visualizers.length - 10) {
-    const deepSpaceScale = 5.0;
+    let deepSpaceScale = 5.0;
     cameraTargetPosition.multiplyScalar(deepSpaceScale);
     radius *= deepSpaceScale;
   }
-  const focusProgress = focusTransitionTime / FOCUS_TRANSITION_DURATION;
-  const focusSpeed = 0.005 + Math.sin(focusProgress * Math.PI) * 0.01;
+  let focusProgress = focusTransitionTime / FOCUS_TRANSITION_DURATION;
+  let focusSpeed = 0.005 + Math.sin(focusProgress * Math.PI) * 0.01;
   targetFocusPoint.lerp(visualizers[currentVisualizer].particles.position, focusSpeed);
   focusPoint.lerp(targetFocusPoint, focusSpeed);
   if (focusTransitionTime >= FOCUS_TRANSITION_DURATION * 0.8) {
@@ -411,12 +411,12 @@ function init() {
     antialias: true
   });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  const positions = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(200, 0, 0), new THREE.Vector3(-200, 0, 0), new THREE.Vector3(0, 200, 0), new THREE.Vector3(0, -200, 0), new THREE.Vector3(200, 200, 0), new THREE.Vector3(-200, -200, 0), new THREE.Vector3(200, -200, 0), new THREE.Vector3(-200, 200, 0), new THREE.Vector3(0, 0, 200), new THREE.Vector3(0, 300, 0), new THREE.Vector3(0, -300, 0), new THREE.Vector3(300, 0, 0), new THREE.Vector3(-300, 0, 0), new THREE.Vector3(0, 0, 300), new THREE.Vector3(0, 0, -300), new THREE.Vector3(400, 400, 400), new THREE.Vector3(-400, -400, -400), new THREE.Vector3(500, 0, 500), new THREE.Vector3(-500, 0, -500), new THREE.Vector3(1000, 1000, 1000), new THREE.Vector3(-1000, -1000, -1000), new THREE.Vector3(1500, 0, 1500), new THREE.Vector3(-1500, 0, -1500), new THREE.Vector3(0, 2000, 0), new THREE.Vector3(2000, 2000, 0), new THREE.Vector3(-2000, -2000, 0), new THREE.Vector3(0, 0, 2500), new THREE.Vector3(3000, 3000, 3000), new THREE.Vector3(-3000, -3000, -3000)];
+  let positions = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(200, 0, 0), new THREE.Vector3(-200, 0, 0), new THREE.Vector3(0, 200, 0), new THREE.Vector3(0, -200, 0), new THREE.Vector3(200, 200, 0), new THREE.Vector3(-200, -200, 0), new THREE.Vector3(200, -200, 0), new THREE.Vector3(-200, 200, 0), new THREE.Vector3(0, 0, 200), new THREE.Vector3(0, 300, 0), new THREE.Vector3(0, -300, 0), new THREE.Vector3(300, 0, 0), new THREE.Vector3(-300, 0, 0), new THREE.Vector3(0, 0, 300), new THREE.Vector3(0, 0, -300), new THREE.Vector3(400, 400, 400), new THREE.Vector3(-400, -400, -400), new THREE.Vector3(500, 0, 500), new THREE.Vector3(-500, 0, -500), new THREE.Vector3(1000, 1000, 1000), new THREE.Vector3(-1000, -1000, -1000), new THREE.Vector3(1500, 0, 1500), new THREE.Vector3(-1500, 0, -1500), new THREE.Vector3(0, 2000, 0), new THREE.Vector3(2000, 2000, 0), new THREE.Vector3(-2000, -2000, 0), new THREE.Vector3(0, 0, 2500), new THREE.Vector3(3000, 3000, 3000), new THREE.Vector3(-3000, -3000, -3000)];
   visualizers = positions.map((pos, index) => new Visualizer(pos, index < 10 ? particleCount : particleCount * 2, index));
-  const starsGeometry = new THREE.BufferGeometry();
-  const starsPositions = new Float32Array(10000 * 3);
-  const starsColors = new Float32Array(10000 * 3);
-  const starsSizes = new Float32Array(10000);
+  let starsGeometry = new THREE.BufferGeometry();
+  let starsPositions = new Float32Array(10000 * 3);
+  let starsColors = new Float32Array(10000 * 3);
+  let starsSizes = new Float32Array(10000);
   for (let i = 0; i < starsPositions.length; i += 3) {
     const radius = 200 + Math.random() * 300;
     const theta = Math.random() * Math.PI * 2;
@@ -456,15 +456,15 @@ function init() {
 function animate() {
   requestAnimationFrame(animate);
   if (playing) {
-    const frequencyData = new Uint8Array(analyser.frequencyBinCount);
-    const waveformData = new Uint8Array(waveformAnalyser.frequencyBinCount);
+    let frequencyData = new Uint8Array(analyser.frequencyBinCount);
+    let waveformData = new Uint8Array(waveformAnalyser.frequencyBinCount);
     analyser.getByteFrequencyData(frequencyData);
     waveformAnalyser.getByteTimeDomainData(waveformData);
     let bassSum = 0;
     for (let i = 0; i < 10; i++) {
       bassSum += frequencyData[i];
     }
-    bassAvg = bassSum / 10;
+    let bassAvg = bassSum / 10;
     visualizers.forEach((visualizer, index) => {
       visualizer.update(frequencyData, waveformData, bassAvg);
       const energyLevel = bassAvg / 255;
