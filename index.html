@@ -1,5 +1,5 @@
 <html><head><base href="/">
-<title>3D Space Audio Visualizer</title>
+<title>Enhanced 3D Space Audio Visualizer</title>
 <style>
   body {
     margin: 0;
@@ -55,40 +55,46 @@
 
 <script>
 let scene, camera, renderer, particles, audioContext, analyser, source;
+let waveformAnalyser;
 let playing = false;
-const particleCount = 2000;
+const particleCount = 3000; 
 const audio = new Audio('Forest Rhythm - Track 1 - Sonauto (2).wav');
 
 function init() {
-  // Three.js setup
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
   renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('visualizer'), antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   
-  // Create particles
   const geometry = new THREE.BufferGeometry();
   const positions = new Float32Array(particleCount * 3);
   const colors = new Float32Array(particleCount * 3);
+  const sizes = new Float32Array(particleCount);
   
   for(let i = 0; i < particleCount * 3; i += 3) {
-    positions[i] = (Math.random() - 0.5) * 100;
-    positions[i + 1] = (Math.random() - 0.5) * 100;
-    positions[i + 2] = (Math.random() - 0.5) * 100;
+    const angle = (i / 3) * 0.1;
+    const radius = ((i / 3) * 0.02) % 50;
+    positions[i] = Math.cos(angle) * radius;
+    positions[i + 1] = Math.sin(angle) * radius;
+    positions[i + 2] = (Math.random() - 0.5) * 50;
     
     colors[i] = Math.random();
     colors[i + 1] = Math.random();
     colors[i + 2] = Math.random();
+    
+    sizes[i/3] = Math.random() * 2;
   }
   
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
   
   const material = new THREE.PointsMaterial({
-    size: 0.5,
+    size: 1,
     vertexColors: true,
     transparent: true,
-    opacity: 0.8
+    opacity: 0.8,
+    blending: THREE.AdditiveBlending
   });
   
   particles = new THREE.Points(geometry, material);
@@ -96,13 +102,16 @@ function init() {
   
   camera.position.z = 50;
   
-  // Audio setup
   audioContext = new (window.AudioContext || window.webkitAudioContext)();
   analyser = audioContext.createAnalyser();
-  analyser.fftSize = 256;
+  waveformAnalyser = audioContext.createAnalyser();
+  
+  analyser.fftSize = 1024; 
+  waveformAnalyser.fftSize = 2048;
   
   source = audioContext.createMediaElementSource(audio);
   source.connect(analyser);
+  source.connect(waveformAnalyser);
   analyser.connect(audioContext.destination);
   
   audio.loop = true;
@@ -114,48 +123,51 @@ function animate() {
   requestAnimationFrame(animate);
   
   if (playing) {
-    const dataArray = new Uint8Array(analyser.frequencyBinCount);
-    analyser.getByteFrequencyData(dataArray);
+    const frequencyData = new Uint8Array(analyser.frequencyBinCount);
+    const waveformData = new Uint8Array(waveformAnalyser.frequencyBinCount);
+    analyser.getByteFrequencyData(frequencyData);
+    waveformAnalyser.getByteTimeDomainData(waveformData);
     
     const positions = particles.geometry.attributes.position.array;
     const colors = particles.geometry.attributes.color.array;
+    const sizes = particles.geometry.attributes.size.array;
+    
+    let bassSum = 0;
+    for(let i = 0; i < 10; i++) {
+      bassSum += frequencyData[i];
+    }
+    const bassAvg = bassSum / 10;
     
     for(let i = 0; i < positions.length; i += 3) {
-      const freqIndex = Math.floor(i / positions.length * dataArray.length);
-      const frequency = dataArray[freqIndex];
+      const freqIndex = Math.floor(i / positions.length * frequencyData.length);
+      const waveformIndex = Math.floor(i / positions.length * waveformData.length);
+      const frequency = frequencyData[freqIndex];
+      const waveform = (waveformData[waveformIndex] - 128) / 128;
       
-      // Update positions based on audio
-      const distance = Math.sqrt(
-        positions[i] ** 2 + 
-        positions[i + 1] ** 2 + 
-        positions[i + 2] ** 2
-      );
+      const angle = (i / 3) * 0.1 + (bassAvg / 255) * 0.1;
+      const radius = ((i / 3) * 0.02 + (frequency / 255) * 0.5) % 50;
       
-      const scale = 1 + (frequency / 255) * 0.5;
+      positions[i] = Math.cos(angle) * radius * (1 + waveform * 0.2);
+      positions[i + 1] = Math.sin(angle) * radius * (1 + waveform * 0.2);
+      positions[i + 2] *= 0.99 + (frequency / 255) * 0.02;
       
-      positions[i] *= scale;
-      positions[i + 1] *= scale;
-      positions[i + 2] *= scale;
-      
-      // Keep particles within bounds
-      if (distance > 100) {
-        positions[i] *= 0.95;
-        positions[i + 1] *= 0.95;
-        positions[i + 2] *= 0.95;
-      }
-      
-      // Update colors based on audio
       colors[i] = frequency / 255;
-      colors[i + 1] = 0.5 - (frequency / 512);
-      colors[i + 2] = 1 - (frequency / 255);
+      colors[i + 1] = waveform + 0.5;
+      colors[i + 2] = bassAvg / 255;
+      
+      sizes[i/3] = 1 + (frequency / 255) * 3;
     }
     
     particles.geometry.attributes.position.needsUpdate = true;
     particles.geometry.attributes.color.needsUpdate = true;
+    particles.geometry.attributes.size.needsUpdate = true;
+    
+    particles.rotation.x += 0.001 + (bassAvg / 255) * 0.01;
+    particles.rotation.y += 0.002 + (bassAvg / 255) * 0.01;
+  } else {
+    particles.rotation.x += 0.001;
+    particles.rotation.y += 0.002;
   }
-  
-  particles.rotation.x += 0.001;
-  particles.rotation.y += 0.002;
   
   renderer.render(scene, camera);
 }
@@ -187,7 +199,6 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// Add mouse/touch interaction
 let isMouseDown = false;
 let previousMousePosition = { x: 0, y: 0 };
 
@@ -208,7 +219,6 @@ document.addEventListener('mousemove', (e) => {
   };
 });
 
-// Add zoom control
 document.addEventListener('wheel', (e) => {
   camera.position.z += e.deltaY * 0.1;
   camera.position.z = Math.max(10, Math.min(100, camera.position.z));
