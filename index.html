@@ -61,6 +61,8 @@ let currentVisualizer = 0;
 let transitionProgress = 0;
 let cameraTargetPosition = new THREE.Vector3(0, 0, 50);
 let cameraMovementTime = 0;
+let visualizerMovementTime = 0;
+let focusTransitionTime = 0;
 const particleCount = 3000;
 const audio = new Audio('Forest Rhythm - Track 1 - Sonauto (2).wav');
 let ambientStars;
@@ -69,6 +71,7 @@ let targetFocusPoint = new THREE.Vector3(0, 0, 0);
 let bassAvg = 0;
 let zoomPhase = 0;
 let targetZoom = 50;
+const FOCUS_TRANSITION_DURATION = 10;
 class Visualizer {
   constructor(offset = new THREE.Vector3(0, 0, 0), particleCount = 3000, algorithm = 0) {
     this.particles = this.createParticles(particleCount);
@@ -193,24 +196,44 @@ class Visualizer {
     this.particles.rotation.x += 0.001 + bassAvg / 255 * 0.01;
     this.particles.rotation.y += 0.002 + bassAvg / 255 * 0.01;
   }
+  moveInSpace(time) {
+    const radius = 150;
+    const speed = 0.0002 * (this.algorithm + 1);
+    const heightScale = 50;
+    const angle = time * speed + this.algorithm * Math.PI / 5;
+    const height = Math.sin(time * speed * 0.5) * heightScale;
+    const targetX = Math.cos(angle) * radius;
+    const targetY = height;
+    const targetZ = Math.sin(angle) * radius;
+    this.baseOffset.x = targetX;
+    this.baseOffset.y = targetY;
+    this.baseOffset.z = targetZ;
+  }
   initialPosition(i, axis) {
     return (Math.random() - 0.5) * 50;
   }
 }
 function updateCamera() {
+  visualizerMovementTime += 0.016;
+  focusTransitionTime += 0.016;
+  visualizers.forEach(v => v.moveInSpace(visualizerMovementTime));
+  if (focusTransitionTime >= FOCUS_TRANSITION_DURATION) {
+    focusTransitionTime = 0;
+    currentVisualizer = (currentVisualizer + 1) % visualizers.length;
+  }
   cameraMovementTime += 0.001;
   const radius = 100;
   const height = Math.sin(cameraMovementTime * 0.5) * 30;
   cameraTargetPosition.x = Math.cos(cameraMovementTime) * radius;
   cameraTargetPosition.y = height;
   cameraTargetPosition.z = Math.sin(cameraMovementTime) * radius;
+  const focusProgress = focusTransitionTime / FOCUS_TRANSITION_DURATION;
+  const focusSpeed = 0.005 + Math.sin(focusProgress * Math.PI) * 0.01;
+  targetFocusPoint.lerp(visualizers[currentVisualizer].particles.position, focusSpeed);
+  focusPoint.lerp(targetFocusPoint, focusSpeed);
   zoomPhase += 0.003;
   targetZoom = 50 + Math.sin(zoomPhase) * 30;
   camera.position.z = THREE.MathUtils.lerp(camera.position.z, targetZoom, 0.01);
-  const currentVis = visualizers[currentVisualizer];
-  const focusSpeed = 0.01;
-  targetFocusPoint.lerp(currentVis.particles.position, focusSpeed);
-  focusPoint.lerp(targetFocusPoint, focusSpeed);
   camera.position.lerp(cameraTargetPosition, 0.01);
   camera.lookAt(focusPoint);
 }
@@ -280,16 +303,20 @@ function animate() {
       visualizer.update(frequencyData, waveformData, bassAvg);
       const energyLevel = bassAvg / 255;
       if (energyLevel > 0.8) {
-        transitionProgress += 0.005;
+        transitionProgress += 0.003;
         if (transitionProgress >= 1) {
           transitionProgress = 0;
           currentVisualizer = (currentVisualizer + 1) % visualizers.length;
+          focusTransitionTime = 0;
         }
       }
+      const transitionSpeed = 0.01;
       if (index !== currentVisualizer) {
-        visualizer.particles.position.lerp(visualizer.baseOffset, 0.02);
+        visualizer.particles.position.lerp(visualizer.baseOffset, transitionSpeed);
       } else {
-        visualizer.particles.position.lerp(new THREE.Vector3(0, 0, 0), 0.02);
+        const targetPos = new THREE.Vector3(0, 0, 0);
+        targetPos.add(visualizer.baseOffset.clone().multiplyScalar(0.3));
+        visualizer.particles.position.lerp(targetPos, transitionSpeed);
       }
     });
     updateCamera();
