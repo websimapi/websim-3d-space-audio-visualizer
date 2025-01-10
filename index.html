@@ -67,6 +67,8 @@ let ambientStars;
 let focusPoint = new THREE.Vector3(0, 0, 0);
 let targetFocusPoint = new THREE.Vector3(0, 0, 0);
 let bassAvg = 0;
+let zoomPhase = 0;
+let targetZoom = 50;
 class Visualizer {
   constructor(offset = new THREE.Vector3(0, 0, 0), particleCount = 3000, algorithm = 0) {
     this.particles = this.createParticles(particleCount);
@@ -202,9 +204,13 @@ function updateCamera() {
   cameraTargetPosition.x = Math.cos(cameraMovementTime) * radius;
   cameraTargetPosition.y = height;
   cameraTargetPosition.z = Math.sin(cameraMovementTime) * radius;
+  zoomPhase += 0.003;
+  targetZoom = 50 + Math.sin(zoomPhase) * 30;
+  camera.position.z = THREE.MathUtils.lerp(camera.position.z, targetZoom, 0.01);
   const currentVis = visualizers[currentVisualizer];
-  targetFocusPoint.lerp(currentVis.particles.position, 0.02);
-  focusPoint.lerp(targetFocusPoint, 0.05);
+  const focusSpeed = 0.01;
+  targetFocusPoint.lerp(currentVis.particles.position, focusSpeed);
+  focusPoint.lerp(targetFocusPoint, focusSpeed);
   camera.position.lerp(cameraTargetPosition, 0.01);
   camera.lookAt(focusPoint);
 }
@@ -274,16 +280,16 @@ function animate() {
       visualizer.update(frequencyData, waveformData, bassAvg);
       const energyLevel = bassAvg / 255;
       if (energyLevel > 0.8) {
-        transitionProgress += 0.01;
+        transitionProgress += 0.005;
         if (transitionProgress >= 1) {
           transitionProgress = 0;
           currentVisualizer = (currentVisualizer + 1) % visualizers.length;
         }
       }
       if (index !== currentVisualizer) {
-        visualizer.particles.position.lerp(visualizer.baseOffset, 0.05);
+        visualizer.particles.position.lerp(visualizer.baseOffset, 0.02);
       } else {
-        visualizer.particles.position.lerp(new THREE.Vector3(0, 0, 0), 0.05);
+        visualizer.particles.position.lerp(new THREE.Vector3(0, 0, 0), 0.02);
       }
     });
     updateCamera();
@@ -324,6 +330,8 @@ function resetCamera() {
   camera.rotation.set(0, 0, 0);
   focusPoint.set(0, 0, 0);
   targetFocusPoint.set(0, 0, 0);
+  zoomPhase = 0;
+  targetZoom = 50;
 }
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
