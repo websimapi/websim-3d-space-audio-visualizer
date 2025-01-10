@@ -72,7 +72,7 @@ let bassAvg = 0;
 let zoomPhase = 0;
 let targetZoom = 50;
 let FOCUS_TRANSITION_DURATION = 10;
-let maxZoom = 500;
+let maxZoom = 400;
 let minZoom = 20;
 let closeUpZoomDuration = 5;
 let closeUpZoomTimer = 0;
@@ -102,7 +102,7 @@ class Visualizer {
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
     const material = new THREE.PointsMaterial({
-      size: 2,
+      size: 1,
       vertexColors: true,
       transparent: true,
       opacity: 0.8,
@@ -351,13 +351,13 @@ class Visualizer {
     this.particles.rotation.y += 0.002 + bassAvg / 255 * 0.01;
   }
   moveInSpace(time) {
-    const radius = 200;
+    const radius = 300;
     const speed = 0.0001 * (this.algorithm + 1);
-    const heightScale = 100;
+    const heightScale = 150;
     const angle = time * speed + this.algorithm * Math.PI / 3;
     const secondaryAngle = time * speed * 0.5;
     const height = Math.sin(time * speed * 0.3) * heightScale;
-    const spiralOffset = Math.sin(time * speed * 0.7) * 50;
+    const spiralOffset = Math.sin(time * speed * 0.7) * 100;
     const targetX = Math.cos(angle) * (radius + spiralOffset);
     const targetY = height + Math.sin(secondaryAngle) * heightScale * 0.5;
     const targetZ = Math.sin(angle) * (radius + spiralOffset);
@@ -379,7 +379,7 @@ function updateCamera() {
   }
   cameraMovementTime += 0.001;
   let radius = 300;
-  let height = Math.sin(cameraMovementTime * 0.5) * 200;
+  let height = Math.sin(cameraMovementTime * 0.5) * 100;
   let x = Math.cos(cameraMovementTime) * radius;
   let y = height;
   let z = Math.sin(cameraMovementTime) * radius;
@@ -387,7 +387,7 @@ function updateCamera() {
   cameraTargetPosition.y = y;
   cameraTargetPosition.z = z;
   if (currentVisualizer >= visualizers.length - 10) {
-    let deepSpaceScale = 5.0;
+    let deepSpaceScale = 2.0;
     cameraTargetPosition.multiplyScalar(deepSpaceScale);
     radius *= deepSpaceScale;
   }
@@ -398,10 +398,10 @@ function updateCamera() {
   closeUpZoomTimer += 0.016;
   if (closeUpZoomTimer >= closeUpZoomDuration) {
     closeUpZoomTimer = 0;
-    if (Math.random() < 0.6) {
-      targetZoom = minZoom + Math.random() * 20;
+    if (Math.random() < 0.3) {
+      targetZoom = minZoom + Math.random() * 30;
     } else {
-      targetZoom = 80 + Math.sin(zoomPhase) * 30;
+      targetZoom = 150 + Math.sin(zoomPhase) * 50;
     }
   }
   if (focusTransitionTime >= FOCUS_TRANSITION_DURATION * 0.8) {
@@ -413,7 +413,7 @@ function updateCamera() {
     targetZoom = Math.min(maxZoom, 40 + Math.sin(zoomPhase) * 20);
   }
   camera.position.z = THREE.MathUtils.lerp(camera.position.z, Math.min(Math.max(targetZoom, minZoom), maxZoom), 0.01);
-  camera.position.lerp(cameraTargetPosition, 0.005);
+  camera.position.lerp(cameraTargetPosition, 0.01);
   camera.lookAt(focusPoint);
 }
 function init() {
@@ -425,13 +425,13 @@ function init() {
   });
   renderer.setSize(window.innerWidth, window.innerHeight);
   let positions = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(200, 0, 0), new THREE.Vector3(-200, 0, 0), new THREE.Vector3(0, 200, 0), new THREE.Vector3(0, -200, 0), new THREE.Vector3(200, 200, 0), new THREE.Vector3(-200, -200, 0), new THREE.Vector3(200, -200, 0), new THREE.Vector3(-200, 200, 0), new THREE.Vector3(0, 0, 200), new THREE.Vector3(0, 300, 0), new THREE.Vector3(0, -300, 0), new THREE.Vector3(300, 0, 0), new THREE.Vector3(-300, 0, 0), new THREE.Vector3(0, 0, 300), new THREE.Vector3(0, 0, -300), new THREE.Vector3(400, 400, 400), new THREE.Vector3(-400, -400, -400), new THREE.Vector3(500, 0, 500), new THREE.Vector3(-500, 0, -500), new THREE.Vector3(1000, 1000, 1000), new THREE.Vector3(-1000, -1000, -1000), new THREE.Vector3(1500, 0, 1500), new THREE.Vector3(-1500, 0, -1500), new THREE.Vector3(0, 2000, 0), new THREE.Vector3(2000, 2000, 0), new THREE.Vector3(-2000, -2000, 0), new THREE.Vector3(0, 0, 2500), new THREE.Vector3(3000, 3000, 3000), new THREE.Vector3(-3000, -3000, -3000)];
-  visualizers = positions.map((pos, index) => new Visualizer(pos, index < 10 ? particleCount : particleCount * 4, index));
+  visualizers = positions.map((pos, index) => new Visualizer(pos, index < 10 ? particleCount : particleCount * 2, index));
   let starsGeometry = new THREE.BufferGeometry();
   let starsPositions = new Float32Array(10000 * 3);
   let starsColors = new Float32Array(10000 * 3);
   let starsSizes = new Float32Array(10000);
   for (let i = 0; i < starsPositions.length; i += 3) {
-    const radius = 200 + Math.random() * 300;
+    const radius = 100 + Math.random() * 200;
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.random() * Math.PI;
     starsPositions[i] = radius * Math.sin(phi) * Math.cos(theta);
