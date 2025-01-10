@@ -277,17 +277,19 @@ class Visualizer {
     this.particles.rotation.y += 0.002 + bassAvg / 255 * 0.01;
   }
   moveInSpace(time) {
-    const radius = 150;
-    const speed = 0.0002 * (this.algorithm + 1);
-    const heightScale = 50;
-    const angle = time * speed + this.algorithm * Math.PI / 5;
-    const height = Math.sin(time * speed * 0.5) * heightScale;
-    const targetX = Math.cos(angle) * radius;
-    const targetY = height;
-    const targetZ = Math.sin(angle) * radius;
-    this.baseOffset.x = targetX;
-    this.baseOffset.y = targetY;
-    this.baseOffset.z = targetZ;
+    const radius = 300;
+    const speed = 0.0001 * (this.algorithm + 1);
+    const heightScale = 150;
+    const angle = time * speed + this.algorithm * Math.PI / 3;
+    const secondaryAngle = time * speed * 0.5;
+    const height = Math.sin(time * speed * 0.3) * heightScale;
+    const spiralOffset = Math.sin(time * speed * 0.7) * 100;
+    const targetX = Math.cos(angle) * (radius + spiralOffset);
+    const targetY = height + Math.sin(secondaryAngle) * heightScale * 0.5;
+    const targetZ = Math.sin(angle) * (radius + spiralOffset);
+    this.baseOffset.x = THREE.MathUtils.lerp(this.baseOffset.x, targetX, 0.005);
+    this.baseOffset.y = THREE.MathUtils.lerp(this.baseOffset.y, targetY, 0.005);
+    this.baseOffset.z = THREE.MathUtils.lerp(this.baseOffset.z, targetZ, 0.005);
   }
   initialPosition(i, axis) {
     return (Math.random() - 0.5) * 50;
@@ -302,8 +304,8 @@ function updateCamera() {
     currentVisualizer = (currentVisualizer + 1) % visualizers.length;
   }
   cameraMovementTime += 0.001;
-  const radius = 300;
-  const height = Math.sin(cameraMovementTime * 0.5) * 100;
+  const radius = 600;
+  const height = Math.sin(cameraMovementTime * 0.5) * 200;
   cameraTargetPosition.x = Math.cos(cameraMovementTime) * radius;
   cameraTargetPosition.y = height;
   cameraTargetPosition.z = Math.sin(cameraMovementTime) * radius;
@@ -325,7 +327,7 @@ function init() {
     antialias: true
   });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  const positions = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(100, 0, 0), new THREE.Vector3(-100, 0, 0), new THREE.Vector3(0, 100, 0), new THREE.Vector3(0, -100, 0), new THREE.Vector3(100, 100, 0), new THREE.Vector3(-100, -100, 0), new THREE.Vector3(100, -100, 0), new THREE.Vector3(-100, 100, 0), new THREE.Vector3(0, 0, 100), new THREE.Vector3(0, 200, 0), new THREE.Vector3(0, -200, 0), new THREE.Vector3(200, 0, 0), new THREE.Vector3(-200, 0, 0), new THREE.Vector3(0, 0, 200), new THREE.Vector3(0, 0, -200), new THREE.Vector3(200, 200, 200), new THREE.Vector3(-200, -200, -200), new THREE.Vector3(300, 0, 300), new THREE.Vector3(-300, 0, -300)];
+  const positions = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(200, 0, 0), new THREE.Vector3(-200, 0, 0), new THREE.Vector3(0, 200, 0), new THREE.Vector3(0, -200, 0), new THREE.Vector3(200, 200, 0), new THREE.Vector3(-200, -200, 0), new THREE.Vector3(200, -200, 0), new THREE.Vector3(-200, 200, 0), new THREE.Vector3(0, 0, 200), new THREE.Vector3(0, 300, 0), new THREE.Vector3(0, -300, 0), new THREE.Vector3(300, 0, 0), new THREE.Vector3(-300, 0, 0), new THREE.Vector3(0, 0, 300), new THREE.Vector3(0, 0, -300), new THREE.Vector3(400, 400, 400), new THREE.Vector3(-400, -400, -400), new THREE.Vector3(500, 0, 500), new THREE.Vector3(-500, 0, -500)];
   visualizers = positions.map((pos, index) => new Visualizer(pos, index < 10 ? particleCount : particleCount * 2, index));
   const starsGeometry = new THREE.BufferGeometry();
   const starsPositions = new Float32Array(10000 * 3);
