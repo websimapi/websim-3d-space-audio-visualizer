@@ -72,6 +72,10 @@ let bassAvg = 0;
 let zoomPhase = 0;
 let targetZoom = 50;
 let FOCUS_TRANSITION_DURATION = 10;
+let maxZoom = 1000;
+let minZoom = 20;
+let closeUpZoomDuration = 5;
+let closeUpZoomTimer = 0;
 class Visualizer {
   constructor(offset = new THREE.Vector3(0, 0, 0), particleCount = 3000, algorithm = 0) {
     this.particles = this.createParticles(particleCount);
@@ -391,15 +395,24 @@ function updateCamera() {
   let focusSpeed = 0.005 + Math.sin(focusProgress * Math.PI) * 0.01;
   targetFocusPoint.lerp(visualizers[currentVisualizer].particles.position, focusSpeed);
   focusPoint.lerp(targetFocusPoint, focusSpeed);
+  closeUpZoomTimer += 0.016;
+  if (closeUpZoomTimer >= closeUpZoomDuration) {
+    closeUpZoomTimer = 0;
+    if (Math.random() < 0.3) {
+      targetZoom = minZoom + Math.random() * 30;
+    } else {
+      targetZoom = 150 + Math.sin(zoomPhase) * 50;
+    }
+  }
   if (focusTransitionTime >= FOCUS_TRANSITION_DURATION * 0.8) {
-    targetZoom = 20;
+    targetZoom = minZoom + 20;
   } else if (focusTransitionTime >= FOCUS_TRANSITION_DURATION * 0.2) {
-    targetZoom = 150 + Math.sin(zoomPhase) * 50;
+    targetZoom = Math.min(maxZoom, 150 + Math.sin(zoomPhase) * 50);
   } else {
     zoomPhase += 0.003;
-    targetZoom = 50 + Math.sin(zoomPhase) * 30;
+    targetZoom = Math.min(maxZoom, 50 + Math.sin(zoomPhase) * 30);
   }
-  camera.position.z = THREE.MathUtils.lerp(camera.position.z, targetZoom, 0.01);
+  camera.position.z = THREE.MathUtils.lerp(camera.position.z, Math.min(Math.max(targetZoom, minZoom), maxZoom), 0.01);
   camera.position.lerp(cameraTargetPosition, 0.01);
   camera.lookAt(focusPoint);
 }
@@ -554,7 +567,7 @@ document.addEventListener('mousemove', e => {
 });
 document.addEventListener('wheel', e => {
   camera.position.z += e.deltaY * 0.1;
-  camera.position.z = Math.max(10, Math.min(100, camera.position.z));
+  camera.position.z = Math.max(minZoom, Math.min(maxZoom, camera.position.z));
 });
 init();
 animate();</script>
