@@ -1,0 +1,220 @@
+<html><head><base href="/">
+<title>3D Space Audio Visualizer</title>
+<style>
+  body {
+    margin: 0;
+    background: #000;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+  }
+  
+  #visualizer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+  
+  .controls {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    gap: 20px;
+    background: rgba(0,0,0,0.5);
+    padding: 15px;
+    border-radius: 10px;
+  }
+  
+  button {
+    background: #444;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+  
+  button:hover {
+    background: #666;
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+<canvas id="visualizer"></canvas>
+<div class="controls">
+  <button onclick="togglePlay()">Play/Pause</button>
+  <button onclick="resetCamera()">Reset Camera</button>
+</div>
+
+<script>
+let scene, camera, renderer, particles, audioContext, analyser, source;
+let playing = false;
+const particleCount = 2000;
+const audio = new Audio('Forest Rhythm - Track 1 - Sonauto (2).wav');
+
+function init() {
+  // Three.js setup
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('visualizer'), antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  
+  // Create particles
+  const geometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(particleCount * 3);
+  const colors = new Float32Array(particleCount * 3);
+  
+  for(let i = 0; i < particleCount * 3; i += 3) {
+    positions[i] = (Math.random() - 0.5) * 100;
+    positions[i + 1] = (Math.random() - 0.5) * 100;
+    positions[i + 2] = (Math.random() - 0.5) * 100;
+    
+    colors[i] = Math.random();
+    colors[i + 1] = Math.random();
+    colors[i + 2] = Math.random();
+  }
+  
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  
+  const material = new THREE.PointsMaterial({
+    size: 0.5,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.8
+  });
+  
+  particles = new THREE.Points(geometry, material);
+  scene.add(particles);
+  
+  camera.position.z = 50;
+  
+  // Audio setup
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioContext.createAnalyser();
+  analyser.fftSize = 256;
+  
+  source = audioContext.createMediaElementSource(audio);
+  source.connect(analyser);
+  analyser.connect(audioContext.destination);
+  
+  audio.loop = true;
+  
+  animate();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  
+  if (playing) {
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(dataArray);
+    
+    const positions = particles.geometry.attributes.position.array;
+    const colors = particles.geometry.attributes.color.array;
+    
+    for(let i = 0; i < positions.length; i += 3) {
+      const freqIndex = Math.floor(i / positions.length * dataArray.length);
+      const frequency = dataArray[freqIndex];
+      
+      // Update positions based on audio
+      const distance = Math.sqrt(
+        positions[i] ** 2 + 
+        positions[i + 1] ** 2 + 
+        positions[i + 2] ** 2
+      );
+      
+      const scale = 1 + (frequency / 255) * 0.5;
+      
+      positions[i] *= scale;
+      positions[i + 1] *= scale;
+      positions[i + 2] *= scale;
+      
+      // Keep particles within bounds
+      if (distance > 100) {
+        positions[i] *= 0.95;
+        positions[i + 1] *= 0.95;
+        positions[i + 2] *= 0.95;
+      }
+      
+      // Update colors based on audio
+      colors[i] = frequency / 255;
+      colors[i + 1] = 0.5 - (frequency / 512);
+      colors[i + 2] = 1 - (frequency / 255);
+    }
+    
+    particles.geometry.attributes.position.needsUpdate = true;
+    particles.geometry.attributes.color.needsUpdate = true;
+  }
+  
+  particles.rotation.x += 0.001;
+  particles.rotation.y += 0.002;
+  
+  renderer.render(scene, camera);
+}
+
+function togglePlay() {
+  if (audioContext.state === 'suspended') {
+    audioContext.resume();
+  }
+  
+  if (playing) {
+    audio.pause();
+    playing = false;
+  } else {
+    audio.play();
+    playing = true;
+  }
+}
+
+function resetCamera() {
+  camera.position.z = 50;
+  camera.position.x = 0;
+  camera.position.y = 0;
+  camera.rotation.set(0, 0, 0);
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Add mouse/touch interaction
+let isMouseDown = false;
+let previousMousePosition = { x: 0, y: 0 };
+
+document.addEventListener('mousedown', () => isMouseDown = true);
+document.addEventListener('mouseup', () => isMouseDown = false);
+document.addEventListener('mousemove', (e) => {
+  if (isMouseDown) {
+    const deltaX = e.clientX - previousMousePosition.x;
+    const deltaY = e.clientY - previousMousePosition.y;
+    
+    camera.position.x += deltaX * 0.05;
+    camera.position.y -= deltaY * 0.05;
+  }
+  
+  previousMousePosition = {
+    x: e.clientX,
+    y: e.clientY
+  };
+});
+
+// Add zoom control
+document.addEventListener('wheel', (e) => {
+  camera.position.z += e.deltaY * 0.1;
+  camera.position.z = Math.max(10, Math.min(100, camera.position.z));
+});
+
+init();
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body></html>
