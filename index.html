@@ -63,7 +63,7 @@ let cameraTargetPosition = new THREE.Vector3(0, 0, 50);
 let cameraMovementTime = 0;
 let visualizerMovementTime = 0;
 let focusTransitionTime = 0;
-const particleCount = 3000;
+let particleCount = 3000;
 const audio = new Audio('Forest Rhythm - Track 1 - Sonauto (2).wav');
 let ambientStars;
 let focusPoint = new THREE.Vector3(0, 0, 0);
@@ -376,9 +376,12 @@ function updateCamera() {
   cameraMovementTime += 0.001;
   const radius = 600;
   const height = Math.sin(cameraMovementTime * 0.5) * 200;
-  cameraTargetPosition.x = Math.cos(cameraMovementTime) * radius;
-  cameraTargetPosition.y = height;
-  cameraTargetPosition.z = Math.sin(cameraMovementTime) * radius;
+  let x = Math.cos(cameraMovementTime) * radius;
+  let y = height;
+  let z = Math.sin(cameraMovementTime) * radius;
+  cameraTargetPosition.x = x;
+  cameraTargetPosition.y = y;
+  cameraTargetPosition.z = z;
   if (currentVisualizer >= visualizers.length - 10) {
     const deepSpaceScale = 5.0;
     cameraTargetPosition.multiplyScalar(deepSpaceScale);
@@ -449,6 +452,8 @@ function init() {
   source.connect(waveformAnalyser);
   analyser.connect(audioContext.destination);
   audio.loop = true;
+  let focusPoint = new THREE.Vector3(0, 0, 0);
+  let targetFocusPoint = new THREE.Vector3(0, 0, 0);
 }
 function animate() {
   requestAnimationFrame(animate);
