@@ -57,7 +57,7 @@
 let scene, camera, renderer, particles, audioContext, analyser, source;
 let waveformAnalyser;
 let playing = false;
-const particleCount = 3000; 
+const particleCount = 5000; 
 const audio = new Audio('Forest Rhythm - Track 1 - Sonauto (2).wav');
 
 function init() {
@@ -106,7 +106,7 @@ function init() {
   analyser = audioContext.createAnalyser();
   waveformAnalyser = audioContext.createAnalyser();
   
-  analyser.fftSize = 1024; 
+  analyser.fftSize = 2048; 
   waveformAnalyser.fftSize = 2048;
   
   source = audioContext.createMediaElementSource(audio);
@@ -118,6 +118,10 @@ function init() {
   
   animate();
 }
+
+let lastBassAvg = 0;
+let lastTrebleAvg = 0;
+let smoothedVolume = 0;
 
 function animate() {
   requestAnimationFrame(animate);
@@ -133,10 +137,28 @@ function animate() {
     const sizes = particles.geometry.attributes.size.array;
     
     let bassSum = 0;
+    let trebleSum = 0;
+    let totalVolume = 0;
+    
     for(let i = 0; i < 10; i++) {
       bassSum += frequencyData[i];
     }
     const bassAvg = bassSum / 10;
+    
+    for(let i = Math.floor(frequencyData.length * 0.8); i < frequencyData.length; i++) {
+      trebleSum += frequencyData[i];
+    }
+    const trebleAvg = trebleSum / (frequencyData.length * 0.2);
+    
+    for(let i = 0; i < frequencyData.length; i++) {
+      totalVolume += frequencyData[i];
+    }
+    
+    const volume = totalVolume / frequencyData.length;
+    smoothedVolume = smoothedVolume * 0.95 + volume * 0.05;
+    
+    const bassDelta = Math.abs(bassAvg - lastBassAvg);
+    const trebleDelta = Math.abs(trebleAvg - lastTrebleAvg);
     
     for(let i = 0; i < positions.length; i += 3) {
       const freqIndex = Math.floor(i / positions.length * frequencyData.length);
@@ -144,26 +166,30 @@ function animate() {
       const frequency = frequencyData[freqIndex];
       const waveform = (waveformData[waveformIndex] - 128) / 128;
       
-      const angle = (i / 3) * 0.1 + (bassAvg / 255) * 0.1;
-      const radius = ((i / 3) * 0.02 + (frequency / 255) * 0.5) % 50;
+      const angle = (i / 3) * 0.1 + (bassAvg / 255) * 0.2;
+      const radius = ((i / 3) * 0.02 + (frequency / 255) * (1 + trebleAvg/255)) % 50;
       
-      positions[i] = Math.cos(angle) * radius * (1 + waveform * 0.2);
-      positions[i + 1] = Math.sin(angle) * radius * (1 + waveform * 0.2);
-      positions[i + 2] *= 0.99 + (frequency / 255) * 0.02;
+      positions[i] = Math.cos(angle) * radius * (1 + waveform * 0.3);
+      positions[i + 1] = Math.sin(angle) * radius * (1 + waveform * 0.3);
+      positions[i + 2] *= 0.99 + (frequency / 255) * 0.03;
       
-      colors[i] = frequency / 255;
-      colors[i + 1] = waveform + 0.5;
-      colors[i + 2] = bassAvg / 255;
+      colors[i] = Math.min(1, frequency / 255 + bassDelta / 255);
+      colors[i + 1] = Math.min(1, (waveform + 0.5) + trebleDelta / 255);
+      colors[i + 2] = Math.min(1, smoothedVolume / 255);
       
-      sizes[i/3] = 1 + (frequency / 255) * 3;
+      sizes[i/3] = 1 + (frequency / 255) * 3 + (smoothedVolume / 255) * 2;
     }
     
     particles.geometry.attributes.position.needsUpdate = true;
     particles.geometry.attributes.color.needsUpdate = true;
     particles.geometry.attributes.size.needsUpdate = true;
     
-    particles.rotation.x += 0.001 + (bassAvg / 255) * 0.01;
-    particles.rotation.y += 0.002 + (bassAvg / 255) * 0.01;
+    particles.rotation.x += 0.001 + (bassAvg / 255) * 0.02;
+    particles.rotation.y += 0.002 + (trebleAvg / 255) * 0.02;
+    particles.rotation.z += 0.001 + (smoothedVolume / 255) * 0.01;
+    
+    lastBassAvg = bassAvg;
+    lastTrebleAvg = trebleAvg;
   } else {
     particles.rotation.x += 0.001;
     particles.rotation.y += 0.002;
