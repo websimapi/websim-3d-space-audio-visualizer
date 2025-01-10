@@ -107,6 +107,7 @@ class Visualizer {
     return new THREE.Points(geometry, material);
   }
   updateParticle(i, positions, colors, sizes, frequency, waveform, bassAvg) {
+    const particleCount = positions.length / 3;
     const algorithms = [() => {
       const angle = i / 3 * 0.1 + bassAvg / 255 * 0.1;
       const radius = (i / 3 * 0.02 + frequency / 255 * 0.5) % 50;
@@ -172,6 +173,85 @@ class Visualizer {
       positions[i] += Math.sin(t + positions[i]) * 0.1 * scale;
       positions[i + 1] += Math.cos(t + positions[i + 1]) * 0.1 * (1 + waveform);
       positions[i + 2] += Math.sin(t + positions[i + 2]) * 0.1 * (1 + bassAvg / 255);
+    }, () => {
+      const t = Date.now() * 0.001;
+      const size = 25 * (1 + frequency / 255);
+      const phase = i / 3 % 6 * Math.PI / 3 + bassAvg / 255;
+      positions[i] = Math.cos(phase) * size * (1 + waveform);
+      positions[i + 1] = Math.sin(phase) * size * (1 + waveform);
+      positions[i + 2] = Math.cos(t) * size * (1 + bassAvg / 255);
+    }, () => {
+      const t = i / 3 * 0.1;
+      const radius = 20 * (1 + frequency / 255);
+      positions[i] = Math.cos(t) * radius;
+      positions[i + 1] = t * 2 - 50;
+      positions[i + 2] = Math.sin(t) * radius * (1 + waveform);
+    }, () => {
+      const angle = i / 3 * Math.PI * 2 / particleCount;
+      const r = 30 * (1 + bassAvg / 255);
+      positions[i] *= 0.95;
+      positions[i + 1] *= 0.95;
+      positions[i + 2] *= 0.95;
+      if (Math.random() < 0.01) {
+        positions[i] = Math.cos(angle) * r * (1 + frequency / 255);
+        positions[i + 1] = Math.sin(angle) * r * (1 + waveform);
+        positions[i + 2] = (Math.random() - 0.5) * r;
+      }
+    }, () => {
+      const t = Date.now() * 0.001;
+      positions[i] += Math.sin(positions[i + 1] * 0.1 + t) * (1 + frequency / 255) * 0.5;
+      positions[i + 1] += 0.2 * (1 + waveform);
+      if (positions[i + 1] > 50) positions[i + 1] = -50;
+      positions[i + 2] = Math.sin(positions[i] * 0.1) * 20 * (1 + bassAvg / 255);
+    }, () => {
+      const scale = 1 + frequency / 255;
+      positions[i] += (Math.random() - 0.5) * scale;
+      positions[i + 1] += (Math.random() - 0.5) * (1 + waveform);
+      positions[i + 2] += (Math.random() - 0.5) * (1 + bassAvg / 255);
+      const dist = Math.sqrt(positions[i] ** 2 + positions[i + 1] ** 2 + positions[i + 2] ** 2);
+      if (dist > 50) {
+        positions[i] *= 0.9;
+        positions[i + 1] *= 0.9;
+        positions[i + 2] *= 0.9;
+      }
+    }, () => {
+      const angle = Math.atan2(positions[i + 1], positions[i]);
+      const dist = Math.sqrt(positions[i] ** 2 + positions[i + 1] ** 2);
+      positions[i] = Math.cos(angle + bassAvg / 255) * dist * (1 + frequency / 255);
+      positions[i + 1] = Math.sin(angle + bassAvg / 255) * dist * (1 + waveform);
+      positions[i + 2] *= 0.98 + Math.random() * 0.04;
+    }, () => {
+      const t = Date.now() * 0.001;
+      const noise = Math.sin(positions[i] * 0.1 + t) * Math.cos(positions[i + 1] * 0.1 + t);
+      positions[i] += noise * (1 + frequency / 255);
+      positions[i + 1] += noise * (1 + waveform);
+      positions[i + 2] += noise * (1 + bassAvg / 255);
+    }, () => {
+      const angle = Math.atan2(positions[i + 1], positions[i]);
+      const r = Math.sqrt(positions[i] ** 2 + positions[i + 1] ** 2);
+      positions[i] = Math.cos(angle * 1.5) * r * (1 + frequency / 255);
+      positions[i + 1] = Math.sin(angle * 1.5) * r * (1 + waveform);
+      positions[i + 2] += Math.sin(r * 0.1) * (1 + bassAvg / 255);
+    }, () => {
+      const angle = Math.atan2(positions[i + 1], positions[i]);
+      const r = Math.sqrt(positions[i] ** 2 + positions[i + 1] ** 2);
+      positions[i] = Math.cos(angle + r * 0.1) * r * (1 + frequency / 255);
+      positions[i + 1] = Math.sin(angle + r * 0.1) * r * (1 + waveform);
+      positions[i + 2] *= 0.99 + bassAvg / 255 * 0.02;
+    }, () => {
+      const t = Date.now() * 0.001;
+      const scale = 1 + Math.sin(t * 0.5) * 0.2;
+      positions[i] *= scale * (1 + frequency / 255);
+      positions[i + 1] *= scale * (1 + waveform);
+      positions[i + 2] *= scale * (1 + bassAvg / 255);
+      if (Math.random() < 0.01) {
+        const r = 100;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.random() * Math.PI;
+        positions[i] = r * Math.sin(phi) * Math.cos(theta);
+        positions[i + 1] = r * Math.sin(phi) * Math.sin(theta);
+        positions[i + 2] = r * Math.cos(phi);
+      }
     }];
     algorithms[this.algorithm]();
     colors[i] = frequency / 255;
@@ -222,8 +302,8 @@ function updateCamera() {
     currentVisualizer = (currentVisualizer + 1) % visualizers.length;
   }
   cameraMovementTime += 0.001;
-  const radius = 100;
-  const height = Math.sin(cameraMovementTime * 0.5) * 30;
+  const radius = 300;
+  const height = Math.sin(cameraMovementTime * 0.5) * 100;
   cameraTargetPosition.x = Math.cos(cameraMovementTime) * radius;
   cameraTargetPosition.y = height;
   cameraTargetPosition.z = Math.sin(cameraMovementTime) * radius;
@@ -245,8 +325,8 @@ function init() {
     antialias: true
   });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  const positions = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(100, 0, 0), new THREE.Vector3(-100, 0, 0), new THREE.Vector3(0, 100, 0), new THREE.Vector3(0, -100, 0), new THREE.Vector3(100, 100, 0), new THREE.Vector3(-100, -100, 0), new THREE.Vector3(100, -100, 0), new THREE.Vector3(-100, 100, 0), new THREE.Vector3(0, 0, 100)];
-  visualizers = positions.map((pos, index) => new Visualizer(pos, particleCount, index));
+  const positions = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(100, 0, 0), new THREE.Vector3(-100, 0, 0), new THREE.Vector3(0, 100, 0), new THREE.Vector3(0, -100, 0), new THREE.Vector3(100, 100, 0), new THREE.Vector3(-100, -100, 0), new THREE.Vector3(100, -100, 0), new THREE.Vector3(-100, 100, 0), new THREE.Vector3(0, 0, 100), new THREE.Vector3(0, 200, 0), new THREE.Vector3(0, -200, 0), new THREE.Vector3(200, 0, 0), new THREE.Vector3(-200, 0, 0), new THREE.Vector3(0, 0, 200), new THREE.Vector3(0, 0, -200), new THREE.Vector3(200, 200, 200), new THREE.Vector3(-200, -200, -200), new THREE.Vector3(300, 0, 300), new THREE.Vector3(-300, 0, -300)];
+  visualizers = positions.map((pos, index) => new Visualizer(pos, index < 10 ? particleCount : particleCount * 2, index));
   const starsGeometry = new THREE.BufferGeometry();
   const starsPositions = new Float32Array(10000 * 3);
   const starsColors = new Float32Array(10000 * 3);
