@@ -1,5 +1,5 @@
 <html><head><base href="/">
-<title>Enhanced 3D Space Audio Visualizer</title>
+<title>Enhanced Multi-Scene 3D Space Audio Visualizer</title>
 <style>
   body {
     margin: 0;
@@ -54,11 +54,134 @@
 </div>
 
 <script>
-let scene, camera, renderer, particles, audioContext, analyser, source;
+let scene, camera, renderer, analyser, source;
 let waveformAnalyser;
 let playing = false;
-const particleCount = 5000; 
+let visualizers = [];
+let currentVisualizer = 0;
+let transitionProgress = 0;
+const particleCount = 3000;
 const audio = new Audio('Forest Rhythm - Track 1 - Sonauto (2).wav');
+
+class Visualizer {
+  constructor(offset = new THREE.Vector3(0, 0, 0), particleCount = 3000) {
+    this.particles = this.createParticles(particleCount);
+    this.particles.position.copy(offset);
+    this.baseOffset = offset.clone();
+    scene.add(this.particles);
+  }
+
+  createParticles(count) {
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+    
+    for(let i = 0; i < count * 3; i += 3) {
+      positions[i] = this.initialPosition(i, 0);
+      positions[i + 1] = this.initialPosition(i, 1);
+      positions[i + 2] = this.initialPosition(i, 2);
+      
+      colors[i] = Math.random();
+      colors[i + 1] = Math.random();
+      colors[i + 2] = Math.random();
+      
+      sizes[i/3] = Math.random() * 2;
+    }
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    
+    const material = new THREE.PointsMaterial({
+      size: 1,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending
+    });
+    
+    return new THREE.Points(geometry, material);
+  }
+
+  initialPosition(i, axis) {
+    const patterns = [
+      // Spiral
+      () => {
+        const angle = (i / 3) * 0.1;
+        const radius = ((i / 3) * 0.02) % 50;
+        return axis === 0 ? Math.cos(angle) * radius :
+               axis === 1 ? Math.sin(angle) * radius :
+               (Math.random() - 0.5) * 50;
+      },
+      // Cube
+      () => (Math.random() - 0.5) * 50,
+      // Sphere
+      () => {
+        const phi = Math.random() * Math.PI * 2;
+        const theta = Math.random() * Math.PI;
+        const radius = 25;
+        return axis === 0 ? radius * Math.sin(theta) * Math.cos(phi) :
+               axis === 1 ? radius * Math.sin(theta) * Math.sin(phi) :
+               radius * Math.cos(theta);
+      },
+      // Double Helix
+      () => {
+        const t = (i / 3) * 0.1;
+        return axis === 0 ? Math.cos(t) * 20 :
+               axis === 1 ? Math.sin(t) * 20 :
+               t - 25;
+      },
+      // Wave Field
+      () => {
+        const x = (i / 3) % 50 - 25;
+        const z = Math.floor((i / 3) / 50) - 25;
+        return axis === 0 ? x :
+               axis === 1 ? Math.sin(Math.sqrt(x*x + z*z) * 0.3) * 10 :
+               z;
+      }
+    ];
+    
+    return patterns[Math.floor(i/3) % patterns.length]();
+  }
+
+  update(frequencyData, waveformData, bassAvg) {
+    const positions = this.particles.geometry.attributes.position.array;
+    const colors = this.particles.geometry.attributes.color.array;
+    const sizes = this.particles.geometry.attributes.size.array;
+    
+    for(let i = 0; i < positions.length; i += 3) {
+      const freqIndex = Math.floor(i / positions.length * frequencyData.length);
+      const waveformIndex = Math.floor(i / positions.length * waveformData.length);
+      const frequency = frequencyData[freqIndex];
+      const waveform = (waveformData[waveformIndex] - 128) / 128;
+      
+      this.updateParticle(i, positions, colors, sizes, frequency, waveform, bassAvg);
+    }
+    
+    this.particles.geometry.attributes.position.needsUpdate = true;
+    this.particles.geometry.attributes.color.needsUpdate = true;
+    this.particles.geometry.attributes.size.needsUpdate = true;
+    
+    this.particles.rotation.x += 0.001 + (bassAvg / 255) * 0.01;
+    this.particles.rotation.y += 0.002 + (bassAvg / 255) * 0.01;
+  }
+
+  updateParticle(i, positions, colors, sizes, frequency, waveform, bassAvg) {
+    const angle = (i / 3) * 0.1 + (bassAvg / 255) * 0.1;
+    const radius = ((i / 3) * 0.02 + (frequency / 255) * 0.5) % 50;
+    
+    positions[i] = Math.cos(angle) * radius * (1 + waveform * 0.2);
+    positions[i + 1] = Math.sin(angle) * radius * (1 + waveform * 0.2);
+    positions[i + 2] *= 0.99 + (frequency / 255) * 0.02;
+    
+    colors[i] = frequency / 255;
+    colors[i + 1] = waveform + 0.5;
+    colors[i + 2] = bassAvg / 255;
+    
+    sizes[i/3] = 1 + (frequency / 255) * 3;
+  }
+}
 
 function init() {
   scene = new THREE.Scene();
@@ -66,39 +189,21 @@ function init() {
   renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('visualizer'), antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   
-  const geometry = new THREE.BufferGeometry();
-  const positions = new Float32Array(particleCount * 3);
-  const colors = new Float32Array(particleCount * 3);
-  const sizes = new Float32Array(particleCount);
+  // Create 10 visualizers with different offsets
+  const positions = [
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(100, 0, 0),
+    new THREE.Vector3(-100, 0, 0),
+    new THREE.Vector3(0, 100, 0),
+    new THREE.Vector3(0, -100, 0),
+    new THREE.Vector3(100, 100, 0),
+    new THREE.Vector3(-100, -100, 0),
+    new THREE.Vector3(100, -100, 0),
+    new THREE.Vector3(-100, 100, 0),
+    new THREE.Vector3(0, 0, 100)
+  ];
   
-  for(let i = 0; i < particleCount * 3; i += 3) {
-    const angle = (i / 3) * 0.1;
-    const radius = ((i / 3) * 0.02) % 50;
-    positions[i] = Math.cos(angle) * radius;
-    positions[i + 1] = Math.sin(angle) * radius;
-    positions[i + 2] = (Math.random() - 0.5) * 50;
-    
-    colors[i] = Math.random();
-    colors[i + 1] = Math.random();
-    colors[i + 2] = Math.random();
-    
-    sizes[i/3] = Math.random() * 2;
-  }
-  
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-  
-  const material = new THREE.PointsMaterial({
-    size: 1,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.8,
-    blending: THREE.AdditiveBlending
-  });
-  
-  particles = new THREE.Points(geometry, material);
-  scene.add(particles);
+  visualizers = positions.map(pos => new Visualizer(pos));
   
   camera.position.z = 50;
   
@@ -106,7 +211,7 @@ function init() {
   analyser = audioContext.createAnalyser();
   waveformAnalyser = audioContext.createAnalyser();
   
-  analyser.fftSize = 2048; 
+  analyser.fftSize = 1024;
   waveformAnalyser.fftSize = 2048;
   
   source = audioContext.createMediaElementSource(audio);
@@ -115,13 +220,7 @@ function init() {
   analyser.connect(audioContext.destination);
   
   audio.loop = true;
-  
-  animate();
 }
-
-let lastBassAvg = 0;
-let lastTrebleAvg = 0;
-let smoothedVolume = 0;
 
 function animate() {
   requestAnimationFrame(animate);
@@ -132,67 +231,33 @@ function animate() {
     analyser.getByteFrequencyData(frequencyData);
     waveformAnalyser.getByteTimeDomainData(waveformData);
     
-    const positions = particles.geometry.attributes.position.array;
-    const colors = particles.geometry.attributes.color.array;
-    const sizes = particles.geometry.attributes.size.array;
-    
     let bassSum = 0;
-    let trebleSum = 0;
-    let totalVolume = 0;
-    
     for(let i = 0; i < 10; i++) {
       bassSum += frequencyData[i];
     }
     const bassAvg = bassSum / 10;
     
-    for(let i = Math.floor(frequencyData.length * 0.8); i < frequencyData.length; i++) {
-      trebleSum += frequencyData[i];
-    }
-    const trebleAvg = trebleSum / (frequencyData.length * 0.2);
-    
-    for(let i = 0; i < frequencyData.length; i++) {
-      totalVolume += frequencyData[i];
-    }
-    
-    const volume = totalVolume / frequencyData.length;
-    smoothedVolume = smoothedVolume * 0.95 + volume * 0.05;
-    
-    const bassDelta = Math.abs(bassAvg - lastBassAvg);
-    const trebleDelta = Math.abs(trebleAvg - lastTrebleAvg);
-    
-    for(let i = 0; i < positions.length; i += 3) {
-      const freqIndex = Math.floor(i / positions.length * frequencyData.length);
-      const waveformIndex = Math.floor(i / positions.length * waveformData.length);
-      const frequency = frequencyData[freqIndex];
-      const waveform = (waveformData[waveformIndex] - 128) / 128;
+    // Update all visualizers
+    visualizers.forEach((visualizer, index) => {
+      visualizer.update(frequencyData, waveformData, bassAvg);
       
-      const angle = (i / 3) * 0.1 + (bassAvg / 255) * 0.2;
-      const radius = ((i / 3) * 0.02 + (frequency / 255) * (1 + trebleAvg/255)) % 50;
+      // Calculate transition based on sound properties
+      const energyLevel = bassAvg / 255;
+      if (energyLevel > 0.8) {
+        transitionProgress += 0.01;
+        if (transitionProgress >= 1) {
+          transitionProgress = 0;
+          currentVisualizer = (currentVisualizer + 1) % visualizers.length;
+        }
+      }
       
-      positions[i] = Math.cos(angle) * radius * (1 + waveform * 0.3);
-      positions[i + 1] = Math.sin(angle) * radius * (1 + waveform * 0.3);
-      positions[i + 2] *= 0.99 + (frequency / 255) * 0.03;
-      
-      colors[i] = Math.min(1, frequency / 255 + bassDelta / 255);
-      colors[i + 1] = Math.min(1, (waveform + 0.5) + trebleDelta / 255);
-      colors[i + 2] = Math.min(1, smoothedVolume / 255);
-      
-      sizes[i/3] = 1 + (frequency / 255) * 3 + (smoothedVolume / 255) * 2;
-    }
-    
-    particles.geometry.attributes.position.needsUpdate = true;
-    particles.geometry.attributes.color.needsUpdate = true;
-    particles.geometry.attributes.size.needsUpdate = true;
-    
-    particles.rotation.x += 0.001 + (bassAvg / 255) * 0.02;
-    particles.rotation.y += 0.002 + (trebleAvg / 255) * 0.02;
-    particles.rotation.z += 0.001 + (smoothedVolume / 255) * 0.01;
-    
-    lastBassAvg = bassAvg;
-    lastTrebleAvg = trebleAvg;
-  } else {
-    particles.rotation.x += 0.001;
-    particles.rotation.y += 0.002;
+      // Move non-active visualizers away
+      if (index !== currentVisualizer) {
+        visualizer.particles.position.lerp(visualizer.baseOffset, 0.05);
+      } else {
+        visualizer.particles.position.lerp(new THREE.Vector3(0, 0, 0), 0.05);
+      }
+    });
   }
   
   renderer.render(scene, camera);
@@ -251,6 +316,7 @@ document.addEventListener('wheel', (e) => {
 });
 
 init();
+animate();
 </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body></html>
