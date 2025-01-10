@@ -66,6 +66,7 @@ const audio = new Audio('Forest Rhythm - Track 1 - Sonauto (2).wav');
 let ambientStars;
 let focusPoint = new THREE.Vector3(0, 0, 0);
 let targetFocusPoint = new THREE.Vector3(0, 0, 0);
+let bassAvg = 0;
 class Visualizer {
   constructor(offset = new THREE.Vector3(0, 0, 0), particleCount = 3000, algorithm = 0) {
     this.particles = this.createParticles(particleCount);
@@ -268,7 +269,7 @@ function animate() {
     for (let i = 0; i < 10; i++) {
       bassSum += frequencyData[i];
     }
-    const bassAvg = bassSum / 10;
+    bassAvg = bassSum / 10;
     visualizers.forEach((visualizer, index) => {
       visualizer.update(frequencyData, waveformData, bassAvg);
       const energyLevel = bassAvg / 255;
