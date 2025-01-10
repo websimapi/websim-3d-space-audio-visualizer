@@ -452,8 +452,6 @@ function init() {
   source.connect(waveformAnalyser);
   analyser.connect(audioContext.destination);
   audio.loop = true;
-  let focusPoint = new THREE.Vector3(0, 0, 0);
-  let targetFocusPoint = new THREE.Vector3(0, 0, 0);
 }
 function animate() {
   requestAnimationFrame(animate);
