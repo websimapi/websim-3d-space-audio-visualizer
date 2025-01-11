@@ -612,6 +612,7 @@ async function startRecording() {
       }
       streamSource.connect(analyser);
       streamSource.connect(waveformAnalyser);
+      analyser.connect(audioContext.destination);
       playing = true;
     }
     document.querySelector('button[onclick="startRecording()"]').style.display = 'none';
@@ -646,10 +647,12 @@ function stopRecording() {
     recordingStream.getTracks().forEach(track => track.stop());
     if (tabAudioSource) {
       tabAudioSource.disconnect();
+      tabAudioSource.disconnect(audioContext.destination);
     }
     if (source) {
       source.connect(analyser);
       source.connect(waveformAnalyser);
+      analyser.connect(audioContext.destination);
     }
     document.querySelector('button[onclick="startRecording()"]').style.display = 'inline';
     document.querySelector('button[onclick="stopRecording()"]').style.display = 'none';
