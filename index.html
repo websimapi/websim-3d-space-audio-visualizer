@@ -29,7 +29,7 @@
     border-radius: 10px;
   }
   
-  button {
+  .controls button {
     background: #444;
     color: white;
     border: none;
@@ -39,8 +39,13 @@
     transition: 0.3s;
   }
   
-  button:hover {
+  .controls button:hover {
     background: #666;
+  }
+  
+  .controls button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -51,6 +56,8 @@
 <div class="controls">
   <button onclick="togglePlay()">Play/Pause</button>
   <button onclick="resetCamera()">Reset Camera</button>
+  <button onclick="startRecording()">Start Recording Tab</button>
+  <button onclick="stopRecording()" style="display:none">Stop Recording</button>
 </div>
 
 <script>let scene, camera, renderer, analyser, source;
@@ -76,6 +83,11 @@ let maxZoom = 400;
 let minZoom = 20;
 let closeUpZoomDuration = 5;
 let closeUpZoomTimer = 0;
+let mediaRecorder;
+let recordedChunks = [];
+let recordingStream;
+let tabAudioSource;
+let audioContext;
 class Visualizer {
   constructor(offset = new THREE.Vector3(0, 0, 0), particleCount = 3000, algorithm = 0) {
     this.particles = this.createParticles(particleCount);
@@ -455,6 +467,9 @@ function init() {
   ambientStars = new THREE.Points(starsGeometry, starsMaterial);
   scene.add(ambientStars);
   camera.position.z = 50;
+  if (audioContext) {
+    audioContext.close();
+  }
   audioContext = new (window.AudioContext || window.webkitAudioContext)();
   analyser = audioContext.createAnalyser();
   waveformAnalyser = audioContext.createAnalyser();
@@ -544,6 +559,14 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+window.addEventListener('beforeunload', () => {
+  if (recordingStream) {
+    recordingStream.getTracks().forEach(track => track.stop());
+  }
+  if (audioContext) {
+    audioContext.close();
+  }
+});
 let isMouseDown = false;
 let previousMousePosition = {
   x: 0,
@@ -569,6 +592,70 @@ document.addEventListener('wheel', e => {
   camera.position.z += e.deltaY * 0.1;
   camera.position.z = Math.max(minZoom, Math.min(maxZoom, camera.position.z));
 });
+async function startRecording() {
+  try {
+    recordingStream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: true
+    });
+    if (playing) {
+      audio.pause();
+      playing = false;
+    }
+    mediaRecorder = new MediaRecorder(recordingStream);
+    let audioTracks = recordingStream.getAudioTracks();
+    if (audioTracks.length > 0) {
+      let streamSource = audioContext.createMediaStreamSource(recordingStream);
+      tabAudioSource = streamSource;
+      if (source) {
+        source.disconnect();
+      }
+      streamSource.connect(analyser);
+      streamSource.connect(waveformAnalyser);
+      playing = true;
+    }
+    document.querySelector('button[onclick="startRecording()"]').style.display = 'none';
+    document.querySelector('button[onclick="stopRecording()"]').style.display = 'inline';
+    mediaRecorder.ondataavailable = event => {
+      if (event.data.size > 0) {
+        recordedChunks.push(event.data);
+      }
+    };
+    mediaRecorder.onstop = () => {
+      let blob = new Blob(recordedChunks, {
+        type: 'video/webm'
+      });
+      let url = URL.createObjectURL(blob);
+      let a = document.createElement('a');
+      document.body.appendChild(a);
+      a.style.display = 'none';
+      a.href = url;
+      a.download = 'recorded-visualization.webm';
+      a.click();
+      URL.revokeObjectURL(url);
+      recordedChunks = [];
+    };
+    mediaRecorder.start();
+  } catch (err) {
+    console.error("Error: " + err);
+  }
+}
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+    recordingStream.getTracks().forEach(track => track.stop());
+    if (tabAudioSource) {
+      tabAudioSource.disconnect();
+    }
+    if (source) {
+      source.connect(analyser);
+      source.connect(waveformAnalyser);
+    }
+    document.querySelector('button[onclick="startRecording()"]').style.display = 'inline';
+    document.querySelector('button[onclick="stopRecording()"]').style.display = 'none';
+    playing = false;
+  }
+}
 init();
 animate();</script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
