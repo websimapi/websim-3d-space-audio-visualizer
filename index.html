@@ -86,9 +86,6 @@
   }
 
   .algorithm-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     padding: 8px 15px;
     cursor: pointer;
     transition: 0.2s;
@@ -101,69 +98,6 @@
 
   .algorithm-item.active {
     background: rgba(255,255,255,0.2);
-  }
-
-  .toggle-switch {
-    position: relative;
-    display: inline-block;
-    width: 40px;
-    height: 20px;
-    margin-left: 10px;
-  }
-
-  .toggle-switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-  }
-
-  .toggle-slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #444;
-    transition: .4s;
-    border-radius: 20px;
-  }
-
-  .toggle-slider:before {
-    position: absolute;
-    content: "";
-    height: 16px;
-    width: 16px;
-    left: 2px;
-    bottom: 2px;
-    background-color: white;
-    transition: .4s;
-    border-radius: 50%;
-  }
-
-  input:checked + .toggle-slider {
-    background-color: #666;
-  }
-
-  input:checked + .toggle-slider:before {
-    transform: translateX(20px);
-  }
-
-  .visualizer-properties {
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px solid rgba(255,255,255,0.2);
-  }
-
-  .property-slider {
-    width: 100%;
-    margin: 10px 0;
-  }
-
-  .property-label {
-    display: block;
-    margin-bottom: 5px;
-    color: white;
   }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -217,9 +151,6 @@ let menuExpanded = false;
 let targetVisualizerIndex = currentVisualizer;
 let visualizerTransitionTime = 0;
 const VISUALIZER_TRANSITION_DURATION = 3;
-let visualizerStates = new Array(30).fill(true);
-let movementSpeedMultiplier = 1;
-let colorIntensityMultiplier = 1;
 class Visualizer {
   constructor(offset = new THREE.Vector3(0, 0, 0), particleCount = 3000, algorithm = 0) {
     this.particles = this.createParticles(particleCount);
@@ -254,7 +185,7 @@ class Visualizer {
     });
     return new THREE.Points(geometry, material);
   }
-  updateParticle(i, positions, colors, sizes, frequency, waveform, bassAvg, colorIntensityMultiplier) {
+  updateParticle(i, positions, colors, sizes, frequency, waveform, bassAvg) {
     let particleCount = positions.length / 3;
     let algorithms = [() => {
       const angle = i / 3 * 0.1 + bassAvg / 255 * 0.1;
@@ -472,12 +403,12 @@ class Visualizer {
       positions[i + 2] *= 1 + explosionWave * 0.1 * (1 + bassAvg / 255);
     }];
     algorithms[this.algorithm]();
-    colors[i] = frequency / 255 * colorIntensityMultiplier;
-    colors[i + 1] = (waveform + 0.5) * colorIntensityMultiplier;
-    colors[i + 2] = bassAvg / 255 * colorIntensityMultiplier;
+    colors[i] = frequency / 255;
+    colors[i + 1] = waveform + 0.5;
+    colors[i + 2] = bassAvg / 255;
     sizes[i / 3] = 1 + frequency / 255 * 3;
   }
-  update(frequencyData, waveformData, bassAvg, colorIntensityMultiplier) {
+  update(frequencyData, waveformData, bassAvg) {
     const positions = this.particles.geometry.attributes.position.array;
     const colors = this.particles.geometry.attributes.color.array;
     const sizes = this.particles.geometry.attributes.size.array;
@@ -486,7 +417,7 @@ class Visualizer {
       const waveformIndex = Math.floor(i / positions.length * waveformData.length);
       const frequency = frequencyData[freqIndex];
       const waveform = (waveformData[waveformIndex] - 128) / 128;
-      this.updateParticle(i, positions, colors, sizes, frequency, waveform, bassAvg, colorIntensityMultiplier);
+      this.updateParticle(i, positions, colors, sizes, frequency, waveform, bassAvg);
     }
     this.particles.geometry.attributes.position.needsUpdate = true;
     this.particles.geometry.attributes.color.needsUpdate = true;
@@ -494,9 +425,9 @@ class Visualizer {
     this.particles.rotation.x += 0.001 + bassAvg / 255 * 0.01;
     this.particles.rotation.y += 0.002 + bassAvg / 255 * 0.01;
   }
-  moveInSpace(time, movementSpeedMultiplier) {
+  moveInSpace(time) {
     const radius = 300;
-    const speed = 0.0001 * (this.algorithm + 1) * movementSpeedMultiplier;
+    const speed = 0.0001 * (this.algorithm + 1);
     const heightScale = 150;
     const angle = time * speed + this.algorithm * Math.PI / 3;
     const secondaryAngle = time * speed * 0.5;
@@ -583,26 +514,9 @@ function init() {
   const algorithmList = document.querySelector('.algorithm-list');
   algorithmNames.forEach((name, index) => {
     const li = document.createElement('li');
+    li.textContent = name;
     li.className = 'algorithm-item';
-    const nameSpan = document.createElement('span');
-    nameSpan.textContent = name;
-    li.appendChild(nameSpan);
-    const toggleLabel = document.createElement('label');
-    toggleLabel.className = 'toggle-switch';
-    const toggleInput = document.createElement('input');
-    toggleInput.type = 'checkbox';
-    toggleInput.checked = true;
-    toggleInput.onchange = () => toggleVisualizer(index);
-    const toggleSlider = document.createElement('span');
-    toggleSlider.className = 'toggle-slider';
-    toggleLabel.appendChild(toggleInput);
-    toggleLabel.appendChild(toggleSlider);
-    li.appendChild(toggleLabel);
-    li.onclick = e => {
-      if (e.target !== toggleInput) {
-        focusVisualizer(index);
-      }
-    };
+    li.onclick = () => focusVisualizer(index);
     algorithmList.appendChild(li);
   });
   document.querySelector('.menu-toggle').onclick = toggleMenu;
@@ -649,21 +563,6 @@ function init() {
   source.connect(waveformAnalyser);
   analyser.connect(audioContext.destination);
   audio.loop = true;
-  const propertiesDiv = document.createElement('div');
-  propertiesDiv.className = 'visualizer-properties';
-  propertiesDiv.innerHTML = `
-    <h4>Properties</h4>
-    <label class="property-label">Particle Count
-      <input type="range" class="property-slider" id="particleCount" min="1000" max="10000" value="3000">
-    </label>
-    <label class="property-label">Movement Speed
-      <input type="range" class="property-slider" id="movementSpeed" min="1" max="200" value="100">
-    </label>
-    <label class="property-label">Color Intensity
-      <input type="range" class="property-slider" id="colorIntensity" min="0" max="200" value="100">
-    </label>
-  `;
-  document.querySelector('.algorithm-menu').appendChild(propertiesDiv);
 }
 function animate() {
   requestAnimationFrame(animate);
@@ -756,10 +655,6 @@ function updateAlgorithmHighlight() {
     item.classList.toggle('active', i === currentVisualizer);
   });
 }
-function toggleVisualizer(index) {
-  visualizerStates[index] = !visualizerStates[index];
-  visualizers[index].particles.visible = visualizerStates[index];
-}
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -798,35 +693,21 @@ document.addEventListener('wheel', e => {
   camera.position.z += e.deltaY * 0.1;
   camera.position.z = Math.max(minZoom, Math.min(maxZoom, camera.position.z));
 });
-document.getElementById('particleCount')?.addEventListener('input', e => {
-  particleCount = parseInt(e.target.value);
-  visualizers.forEach((v, i) => {
-    if (v.particles) {
-      scene.remove(v.particles);
-      visualizers[i] = new Visualizer(v.baseOffset, particleCount, i);
-      visualizers[i].particles.visible = visualizerStates[i];
-    }
-  });
-});
-document.getElementById('movementSpeed')?.addEventListener('input', e => {
-  movementSpeedMultiplier = parseInt(e.target.value) / 100;
-});
-document.getElementById('colorIntensity')?.addEventListener('input', e => {
-  colorIntensityMultiplier = parseInt(e.target.value) / 100;
-});
 async function startRecording() {
   try {
+    let canvasStream = document.getElementById('visualizer').captureStream();
     recordingStream = await navigator.mediaDevices.getDisplayMedia({
-      video: true,
-      audio: true
+      audio: true,
+      video: false
     });
     if (playing) {
       audio.pause();
       playing = false;
     }
-    mediaRecorder = new MediaRecorder(recordingStream);
-    let audioTracks = recordingStream.getAudioTracks();
-    if (audioTracks.length > 0) {
+    let audioTrack = recordingStream.getAudioTracks()[0];
+    let finalStream = new MediaStream([...canvasStream.getVideoTracks(), audioTrack]);
+    mediaRecorder = new MediaRecorder(finalStream);
+    if (audioTrack) {
       let streamSource = audioContext.createMediaStreamSource(recordingStream);
       tabAudioSource = streamSource;
       if (source) {
@@ -834,10 +715,6 @@ async function startRecording() {
       }
       streamSource.connect(analyser);
       streamSource.connect(waveformAnalyser);
-      let silentNode = audioContext.createGain();
-      silentNode.gain.value = 0;
-      streamSource.connect(silentNode);
-      silentNode.connect(audioContext.destination);
       playing = true;
     }
     document.querySelector('button[onclick="startRecording()"]').style.display = 'none';
