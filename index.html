@@ -47,6 +47,58 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
+
+  .algorithm-menu {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0,0,0,0.7);
+    padding: 15px;
+    border-radius: 10px;
+    color: white;
+    max-height: 80vh;
+    overflow-y: auto;
+    transform: translateX(100%);
+    transition: transform 0.3s;
+  }
+
+  .algorithm-menu.expanded {
+    transform: translateX(0);
+  } 
+
+  .menu-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    z-index: 200;
+  }
+
+  .algorithm-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .algorithm-item {
+    padding: 8px 15px;
+    cursor: pointer;
+    transition: 0.2s;
+    border-radius: 5px;
+  }
+
+  .algorithm-item:hover {
+    background: rgba(255,255,255,0.1);
+  }
+
+  .algorithm-item.active {
+    background: rgba(255,255,255,0.2);
+  }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
@@ -58,6 +110,12 @@
   <button onclick="resetCamera()">Reset Camera</button>
   <button onclick="startRecording()">Start Recording Tab</button>
   <button onclick="stopRecording()" style="display:none">Stop Recording</button>
+</div>
+<button class="menu-toggle">Show Algorithms</button>
+<div class="algorithm-menu">
+  <h3>Visualization Algorithms</h3>
+  <ul class="algorithm-list">
+  </ul>
 </div>
 
 <script>let scene, camera, renderer, analyser, source;
@@ -88,6 +146,11 @@ let recordedChunks = [];
 let recordingStream;
 let tabAudioSource;
 let audioContext;
+let algorithmNames = ["Spiral Rings", "Time Tunnel", "Crystal Grid", "Spherical Shell", "DNA Helix", "Cosmic Butterfly", "Möbius Ring", "Particle Storm", "Wave Terrain", "Quantum Field", "Deep Space Spiral", "Nebula Cloud", "Galactic Core", "Dark Matter Flow", "Celestial Dance", "Hypernova Burst", "Black Hole", "Star Cluster", "Plasma Field", "Astral Threads", "Solar Wind", "Quasar Beam", "Wormhole", "Event Horizon", "Universal Expanse", "Cosmic Web", "Void Walker", "Galactic Wind", "Stellar Nursery", "Dark Energy Flow"];
+let menuExpanded = false;
+let targetVisualizerIndex = currentVisualizer;
+let visualizerTransitionTime = 0;
+const VISUALIZER_TRANSITION_DURATION = 3;
 class Visualizer {
   constructor(offset = new THREE.Vector3(0, 0, 0), particleCount = 3000, algorithm = 0) {
     this.particles = this.createParticles(particleCount);
@@ -382,8 +445,19 @@ class Visualizer {
   }
 }
 function updateCamera() {
+  if (targetVisualizerIndex !== currentVisualizer) {
+    visualizerTransitionTime += 0.016;
+    if (visualizerTransitionTime >= VISUALIZER_TRANSITION_DURATION) {
+      currentVisualizer = targetVisualizerIndex;
+      visualizerTransitionTime = 0;
+      updateAlgorithmHighlight();
+    }
+  }
   visualizerMovementTime += 0.016;
   focusTransitionTime += 0.016;
+  if (visualizerTransitionTime > 0) {
+    focusTransitionTime = 0;
+  }
   visualizers.forEach(v => v.moveInSpace(visualizerMovementTime));
   if (focusTransitionTime >= FOCUS_TRANSITION_DURATION) {
     focusTransitionTime = 0;
@@ -437,6 +511,15 @@ function init() {
   });
   renderer.setSize(window.innerWidth, window.innerHeight);
   let positions = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(200, 0, 0), new THREE.Vector3(-200, 0, 0), new THREE.Vector3(0, 200, 0), new THREE.Vector3(0, -200, 0), new THREE.Vector3(200, 200, 0), new THREE.Vector3(-200, -200, 0), new THREE.Vector3(200, -200, 0), new THREE.Vector3(-200, 200, 0), new THREE.Vector3(0, 0, 200), new THREE.Vector3(0, 300, 0), new THREE.Vector3(0, -300, 0), new THREE.Vector3(300, 0, 0), new THREE.Vector3(-300, 0, 0), new THREE.Vector3(0, 0, 300), new THREE.Vector3(0, 0, -300), new THREE.Vector3(400, 400, 400), new THREE.Vector3(-400, -400, -400), new THREE.Vector3(500, 0, 500), new THREE.Vector3(-500, 0, -500), new THREE.Vector3(1000, 1000, 1000), new THREE.Vector3(-1000, -1000, -1000), new THREE.Vector3(1500, 0, 1500), new THREE.Vector3(-1500, 0, -1500), new THREE.Vector3(0, 2000, 0), new THREE.Vector3(2000, 2000, 0), new THREE.Vector3(-2000, -2000, 0), new THREE.Vector3(0, 0, 2500), new THREE.Vector3(3000, 3000, 3000), new THREE.Vector3(-3000, -3000, -3000)];
+  const algorithmList = document.querySelector('.algorithm-list');
+  algorithmNames.forEach((name, index) => {
+    const li = document.createElement('li');
+    li.textContent = name;
+    li.className = 'algorithm-item';
+    li.onclick = () => focusVisualizer(index);
+    algorithmList.appendChild(li);
+  });
+  document.querySelector('.menu-toggle').onclick = toggleMenu;
   visualizers = positions.map((pos, index) => new Visualizer(pos, index < 10 ? particleCount : particleCount * 2, index));
   let starsGeometry = new THREE.BufferGeometry();
   let starsPositions = new Float32Array(10000 * 3);
@@ -496,12 +579,15 @@ function animate() {
     visualizers.forEach((visualizer, index) => {
       visualizer.update(frequencyData, waveformData, bassAvg);
       const energyLevel = bassAvg / 255;
-      if (energyLevel > 0.8) {
-        transitionProgress += 0.003;
-        if (transitionProgress >= 1) {
-          transitionProgress = 0;
-          currentVisualizer = (currentVisualizer + 1) % visualizers.length;
-          focusTransitionTime = 0;
+      if (visualizerTransitionTime === 0) {
+        if (energyLevel > 0.8) {
+          transitionProgress += 0.003;
+          if (transitionProgress >= 1) {
+            transitionProgress = 0;
+            currentVisualizer = (currentVisualizer + 1) % visualizers.length;
+            focusTransitionTime = 0;
+            updateAlgorithmHighlight();
+          }
         }
       }
       const transitionSpeed = 0.01;
@@ -553,6 +639,21 @@ function resetCamera() {
   targetFocusPoint.set(0, 0, 0);
   zoomPhase = 0;
   targetZoom = 50;
+}
+function toggleMenu() {
+  menuExpanded = !menuExpanded;
+  document.querySelector('.algorithm-menu').classList.toggle('expanded');
+  document.querySelector('.menu-toggle').textContent = menuExpanded ? 'Hide Algorithms' : 'Show Algorithms';
+}
+function focusVisualizer(index) {
+  targetVisualizerIndex = index;
+  visualizerTransitionTime = 0;
+  updateAlgorithmHighlight();
+}
+function updateAlgorithmHighlight() {
+  document.querySelectorAll('.algorithm-item').forEach((item, i) => {
+    item.classList.toggle('active', i === currentVisualizer);
+  });
 }
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -612,7 +713,6 @@ async function startRecording() {
       }
       streamSource.connect(analyser);
       streamSource.connect(waveformAnalyser);
-      analyser.connect(audioContext.destination);
       playing = true;
     }
     document.querySelector('button[onclick="startRecording()"]').style.display = 'none';
@@ -647,7 +747,6 @@ function stopRecording() {
     recordingStream.getTracks().forEach(track => track.stop());
     if (tabAudioSource) {
       tabAudioSource.disconnect();
-      tabAudioSource.disconnect(audioContext.destination);
     }
     if (source) {
       source.connect(analyser);
